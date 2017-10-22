@@ -19,7 +19,7 @@ const structure_id = process.env.structure_id;
  * For more documentation, follow the link below.
  * http://docs.aws.amazon.com/iot/latest/developerguide/iot-lambda-rule.html
  */
-function setNestAwayState (event, context, callback) => {
+function setNestAwayState(event, context, callback) {
     console.log('Received event:', event.clickType);
 
     const body = {'away': event.clickType === 'SINGLE' ? 'away' : 'home'};
@@ -37,22 +37,21 @@ function setNestAwayState (event, context, callback) => {
 
     const req = https.request(options, (res) => {
       if (res.statusCode == 307 && res.headers.location) {
-        makeRedirectedRequest(url.parse(res.headers.location), body);
+        makeRedirectedRequest(url.parse(res.headers.location), body, callback);
       } else {
-        console.log('no redirect occurred');
+        callback(new Error('Expected a Nest API redirect, but did not receive one.'));
       }
     });
 
     req.on('error', (e) => {
-      console.error(e);
+      callback(new Error(e));
     });
 
     req.write(jsonBody);
     req.end();
-
 };
 
-function makeRedirectedRequest(location, body) {
+function makeRedirectedRequest(location, body, callback) {
   const jsonBody = JSON.stringify(body);
   const options = {
     method: 'PUT',
@@ -71,25 +70,25 @@ function makeRedirectedRequest(location, body) {
   const req = https.request(options, (res) => {
     if(res.statusCode >= 400) {
       res.on('data', (chunk) => {
-        console.error('BODY: ' + chunk);
+        callback(new Error(chunk));
       });
     }
 
     res.on('error', (e) => {
-      console.error(e);
+      callback(new Error(e));
     });
 
     console.log(`Away state was set to: ${body.away}`);
   });
 
   req.on('error', (e) => {
-    console.error(e);
+    callback(new Error(e));
   });
 
   req.write(jsonBody);
   req.end();
 }
 
-exports.handler = setNestAwayState;
-// setNestAwayState({'clickType': "SINGLE"}, null, null);
-// setNestAwayState({'clickType': "DOUBLE"}, null, null);
+// exports.handler = setNestAwayState;
+setNestAwayState({'clickType': "SINGLE"}, null, (error, result) => {error ? console.error(error): console.log(result)});
+// setNestAwayState({'clickType': "DOUBLE"}, null, (error, result) => {error ? console.error(error): console.log(result)});
